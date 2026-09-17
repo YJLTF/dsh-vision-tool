@@ -61,6 +61,8 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
   model?: string
   systemPrompt: string
   maxTokens: number
+  /** Master switch; `false` makes both tools refuse to run. */
+  enabled: boolean
 }) {
   const tools: Array<() => void> = []
   tools.push(ctx.tools.register(defineTool({
@@ -99,6 +101,9 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
     },
     async execute(args: { path?: string; prompt?: string }, exec) {
       const target = resolveVisionTarget()
+      if (!target.enabled) {
+        throw new Error('the vision proxy is disabled; enable it in the vision settings')
+      }
       if (target.provider === undefined || target.model === undefined) {
         throw new Error('no vision model configured; set the vision provider and model in settings')
       }
@@ -168,6 +173,10 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
       render: (_args, value: string): ContentBlock[] => [{ type: 'text', text: value }],
     },
     async execute(_args: Record<string, never>, exec) {
+      const target = resolveVisionTarget()
+      if (!target.enabled) {
+        throw new Error('the vision proxy is disabled; enable it in the vision settings')
+      }
       const refs = conversationImages(ctx, exec.agent)
       if (refs.length === 0) return 'No images are referenced in this conversation.'
       return refs.map((ref, index) => {

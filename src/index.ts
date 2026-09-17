@@ -44,6 +44,7 @@ export function apply(ctx: Context, initial: ConfigType) {
       model: config.visionModel || undefined,
       systemPrompt: config.visionSystemPrompt ?? VISION_DEFAULT_PROMPT,
       maxTokens: config.maxTokens ?? 2048,
+      enabled: config.enabled !== false,
     }
   }
 

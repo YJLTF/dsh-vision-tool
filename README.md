@@ -66,7 +66,7 @@ pnpm typecheck  # Host 类型检查（typecheck:client 为浏览器半侧）
 
 | 字段 | 类型 | 默认值 | 含义 |
 |---|---|---|---|
-| `enabled` | boolean | `true` | 总开关。 |
+| `enabled` | boolean | `true` | 总开关。关闭后指导不注入，两个识图工具都会拒绝执行。 |
 | `visionProvider` | string | `''` | 小参数多模态模型的提供方路由（从 dsh 已配置模型中选）。 |
 | `visionModel` | string | `''` | 小参数多模态模型的精确模型 id。 |
 | `visionSystemPrompt` | string | 内置 | 视觉模型每次调用遵循的系统提示词。 |
