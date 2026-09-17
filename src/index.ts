@@ -85,9 +85,11 @@ function guidanceFor(assembly: AssembleContext, config: ConfigType): string {
   return [
     'Some conversation messages may reference attached images that you cannot ',
     'see directly (your model is text-only). To inspect one, call ',
-    '`understand_image` with the image file path and an optional question. A ',
-    'small multimodal model will describe the image, and you can reason about ',
-    'its answer. Never claim to have seen an image unless you actually ran ',
+    '`understand_image` with the image file path and a `prompt`: the prompt is ',
+    'the specific question or task you need answered for your current work, ',
+    'composed from the ongoing conversation — NOT a generic "describe the image". ',
+    'Fold any relevant conversational context into the prompt so the vision model ',
+    'answers precisely. Never claim to have seen an image unless you actually ran ',
     '`understand_image`.',
   ].join('')
 }

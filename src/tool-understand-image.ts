@@ -31,10 +31,13 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
   return ctx.tools.register(defineTool({
     name: 'understand_image',
     description:
-      'Inspect an image saved at a readable path and return a detailed textual '
-      + 'description. Use this when the conversation references an attached or '
-      + 'available image that you cannot see directly. Pass the exact path of the '
-      + 'image and an optional question.',
+      'Inspect an image saved at a readable path against a specific question and '
+      + 'return a focused textual answer. Use this when the conversation references '
+      + 'an attached or available image that you cannot see directly. Pass the exact '
+      + 'path and a `prompt` that is the question you actually need answered given '
+      + 'your task and the ongoing conversation — NOT a generic "describe the '
+      + 'image" instruction. Include the relevant conversational context inside '
+      + '`prompt` so the vision model can answer precisely.',
     parameters: {
       path: {
         type: 'string',
@@ -43,7 +46,11 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
       },
       prompt: {
         type: 'string',
-        description: 'Optional question or instruction about the image.',
+        required: true,
+        description:
+          'The context-derived question or task for the vision model, composed '
+          + 'from your current task and the conversation. Must be specific, not a '
+          + 'generic description request.',
       },
     },
     output: {
@@ -54,6 +61,12 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
       const target = resolveVisionTarget()
       if (target.provider === undefined || target.model === undefined) {
         throw new Error('no vision model configured; set the vision provider and model in settings')
+      }
+      const question = (args.prompt ?? '').trim()
+      if (question.length === 0) {
+        // The whole point is that the main model crafts the vision question from
+        // context; never fall back to a canned description.
+        throw new Error('understand_image requires a context-derived `prompt`')
       }
       const mediaType = EXTENSION_TO_MEDIA[path.extname(args.path).toLowerCase()]
       if (mediaType === undefined) {
@@ -68,7 +81,6 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
         name: path.basename(args.path),
       }
       const [ref] = await ctx.attachments.saveImages([input])
-      const question = (args.prompt ?? '').trim() || 'Describe this image in detail.'
       const user = createUserMessage({
         source: { kind: 'plugin', plugin: PLUGIN_NAME },
         content: [
