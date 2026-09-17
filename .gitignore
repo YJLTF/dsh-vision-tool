@@ -1,0 +1,6 @@
+node_modules/
+.pnpm-store/
+lib/
+dist/
+*.log
+.DS_Store
