@@ -1,5 +1,5 @@
 /**
- * Browser half of the vision-proxy plugin.
+ * Browser half of the dsh-vision-tool plugin.
  *
  * Renders a settings card (keyed by the `vision` namespace) inside the dsh web
  * Settings → Plugins page. It lets the user pick the small multimodal

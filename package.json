@@ -1,5 +1,5 @@
 {
-  "name": "vision-proxy",
+  "name": "dsh-vision-tool",
   "version": "0.1.0",
   "description": "dsh plugin: vision capability proxy. Routes image understanding for text-only main models to a small multimodal model, and backs off entirely when the active model declares multimodal support (inputModalities includes 'image').",
   "type": "module",

@@ -1,4 +1,4 @@
-# vision-proxy
+# dsh-vision-tool
 
 一个 [DeepSeek Harness](https://deepseek-harness.github.io/deepseek-harness/) 插件，让**纯文本主模型**具备识图能力：把图片理解委托给一个小参数多模态模型；当活跃模型自身声明支持多模态输入时，插件**完全退避**、不影响其原生使用。
 

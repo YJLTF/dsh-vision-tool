@@ -4,7 +4,7 @@ import z from '@deepseek-ai/schemastery'
 export const VISION_NS = 'vision'
 
 /** Plugin identity used for message provenance. */
-export const PLUGIN_NAME = 'vision-proxy'
+export const PLUGIN_NAME = 'dsh-vision-tool'
 
 export const VISION_DEFAULT_PROMPT =
   'You are a compact image-understanding model. Describe the attached image ' +
