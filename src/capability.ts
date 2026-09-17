@@ -3,7 +3,8 @@ import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type { Config } from './config.js'
 
 /**
- * Resolve which input modalities one exact provider/model route declares.
+ * Resolve which input modalities one exact provider/model route declares,
+ * honoring a user override ahead of the adapter's metadata.
  *
  * Priority (highest first):
  * 1. the user's explicit override in `config.overrides` (a model the user
@@ -35,9 +36,4 @@ export async function resolveModalities(
 /** Whether a resolved modality list includes image support. */
 export function isVision(modalities: readonly ModelModality[] | undefined): boolean {
   return modalities?.includes('image') === true
-}
-
-/** Whether a resolved modality list is unambiguously text-only. */
-export function isTextOnly(modalities: readonly ModelModality[] | undefined): boolean {
-  return modalities !== undefined && !modalities.includes('image')
 }

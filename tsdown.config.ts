@@ -1,10 +1,9 @@
 import { defineConfig } from 'tsdown'
 
 export default defineConfig({
-  // Host half. The browser card (src/client) is shipped as source only: its
-  // loadable bundle must be produced by the DeepSeek Harness monorepo build
-  // (the `tsdown.client` preset + client module-loader), which is not
-  // reproducible as a standalone build.
+  // Host half only. The browser card (src/client) is bundled separately by
+  // `scripts/build-client.mjs` into the lazy-CJS ModuleLoader wrapper the web
+  // plugin route serves — run as part of `pnpm build` / `prepare`.
   entry: ['src/index.ts'],
   format: ['esm'],
   // JS bundle only; declarations are emitted stably by `tsc --emitDeclarationOnly`

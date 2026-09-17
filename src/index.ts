@@ -1,8 +1,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
+import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import { Config, PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, type Config as ConfigType } from './config.js'
+import { isVision, resolveModalities } from './capability.js'
 import { registerUnderstandImageTool } from './tool-understand-image.js'
 
 /**
@@ -44,18 +46,35 @@ export function apply(ctx: Context, initial: ConfigType) {
         currentSource = next
       },
       onChange: () => {
-        // Hot: `readConfig()` is read through on the next request.
-        void visionTarget()
+        // Read-through needs no invalidation: every consumer re-reads
+        // `readConfig()` per request, so there is nothing to flush here.
       },
     })
   })
+
+  // Adapter-declared input modalities, resolved once per provider/model route
+  // and cached for the synchronous guidance callback (which cannot await).
+  // A route's first assembly falls back to the conservative text-only default
+  // while the resolve is in flight; later rounds see the cached verdict.
+  const adapterModalities = new Map<string, ModelModality[] | undefined>()
+  const modalitiesOf = (provider: string, model: string): ModelModality[] | undefined => {
+    const key = `${provider}\u0000${model}`
+    if (!adapterModalities.has(key)) {
+      adapterModalities.set(key, undefined)
+      // Empty overrides: the cache holds pure adapter metadata — the user's
+      // `overrides` mark is checked separately with higher precedence.
+      void resolveModalities(ctx, provider, model, []).then(modalities =>
+        adapterModalities.set(key, modalities))
+    }
+    return adapterModalities.get(key)
+  }
 
   ctx.inject(['llm', 'attachments', 'tools', 'systemPrompt'], (core) => {
     const unregisterTool = registerUnderstandImageTool(core, visionTarget)
     const unregisterGuidance = core.systemPrompt.context({
       name: `${VISION_NS}:image-guidance`,
       order: 2000,
-      text: (assembly) => guidanceFor(assembly, readConfig()),
+      text: (assembly) => guidanceFor(assembly, readConfig(), modalitiesOf),
     })
     return () => {
       unregisterTool()
@@ -67,21 +86,31 @@ export function apply(ctx: Context, initial: ConfigType) {
 /**
  * Model-visible guidance emitted only for text-only agents. Vision-capable
  * agents get nothing, so the plugin never interferes with native multimodal use.
+ *
+ * Suppression precedence: the user's `overrides` mark wins; then the adapter's
+ * declared `inputModalities` via `lookup` (cached; unknown conservatively keeps
+ * the guidance). Routes with no declared metadata default to text-only,
+ * matching the harness engine's own projection behavior.
  */
-function guidanceFor(assembly: AssembleContext, config: ConfigType): string {
+function guidanceFor(
+  assembly: AssembleContext,
+  config: ConfigType,
+  lookup: (provider: string, model: string) => ModelModality[] | undefined,
+): string {
   if (config.enabled === false || config.guidanceInjection === false) return ''
   if (!config.visionProvider || !config.visionModel) return ''
   const agent: Agent | undefined = assembly.agent
   if (agent === undefined) return ''
-  // Back off when the user explicitly marked the agent's active model
-  // multimodal. Undeclared models default to the text-only path, matching the
-  // harness engine's own `inputModalities` projection behavior.
   const activeModel = agent.options.model
   if (activeModel === undefined) return ''
+  // Back off when the user explicitly marked the agent's active model
+  // multimodal, or when the adapter declares image input for the route.
   const markedVision = config.overrides?.some(
     entry => entry.model === activeModel && entry.modality === 'image',
   )
   if (markedVision) return ''
+  const provider = agent.options.provider
+  if (provider !== undefined && isVision(lookup(provider, activeModel))) return ''
   return [
     'Some conversation messages may reference attached images that you cannot ',
     'see directly (your model is text-only). To inspect one, call ',

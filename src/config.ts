@@ -1,15 +1,7 @@
 import z from '@deepseek-ai/schemastery'
+import { VISION_DEFAULT_PROMPT } from './meta.js'
 
-/** Settings namespace bound to both the Host half and the browser settings card. */
-export const VISION_NS = 'vision'
-
-/** Plugin identity used for message provenance. */
-export const PLUGIN_NAME = 'dsh-vision-tool'
-
-export const VISION_DEFAULT_PROMPT =
-  'You are a compact image-understanding model. Describe the attached image ' +
-  'precisely and completely so a text-only assistant can reason about it. ' +
-  'Answer the specific question asked, and include all visible text verbatim.'
+export { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS } from './meta.js'
 
 export interface ModalityOverride {
   /** Exact model id the declaration applies to. */
