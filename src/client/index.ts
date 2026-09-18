@@ -1,12 +1,16 @@
 /**
  * Browser half of the dsh-vision-tool plugin.
  *
- * Renders a settings card (keyed by the `vision` namespace) inside the dsh web
- * Settings → Plugins page. It lets the user pick the small multimodal
- * (provider, model) from the models dsh already has configured — the card reads
- * the Host-generation model catalog through `remote.session.modelCatalog()`, the
- * same read the built-in model picker uses — and mark which configured models
- * declare multimodal input, which drives the plugin's back-off.
+ * Renders the vision configuration card on the bundle's own page inside the
+ * dsh Plugin Manager (web 顶部「插件」按钮 → 插件管理页 → 已安装 → vision-tool)。
+ * Since dsh 0.1.6-alpha.2 the Settings page no longer hosts plugin cards; the
+ * plugin manager asks bundles for their configuration through the
+ * `plugins.bundle.config` keyed slot, keyed by the bundle's package name and
+ * rendered with the owner face `{ view }` (`'page'` on the bundle's page,
+ * `'summary'` reserved for one-liners). The card still reads the
+ * Host-generation model catalog through `remote.session.modelCatalog()`, the
+ * same read the built-in model picker uses, and edits the `vision` settings
+ * namespace through the client settings scope.
  *
  * BUILD: this bundle must ship as `lib/client.js` in the lazy-CJS
  * `window.__ModuleLoader__` wrapper the web plugin route serves; see
@@ -16,9 +20,10 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Keyed-slot declaration; cross-plugin collaboration stays type-only so the
-// client bundle keeps its purity gate (see the adding-a-settings-card cookbook).
-import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
-import { VISION_NS } from '../meta.js'
+// client bundle keeps its purity gate (slot contract owned by the plugin
+// manager package, never imported at runtime).
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
+import { PLUGIN_NAME, VISION_NS } from '../meta.js'
 import { VisionModelCard, type ModelChoice } from './vision-model-card.js'
 
 /** Card face injected beside the scope: the configured-model choices. */
@@ -76,11 +81,14 @@ export function apply(ctx: ClientContext): void {
     }
   }
   void refresh()
-  ctx.slots.inject('settings.plugin.item', () =>
+  ctx.slots.inject('plugins.bundle.config', () =>
     ctx.slots.register(
       {
-        name: 'settings.plugin.item',
-        key: VISION_NS,
+        name: 'plugins.bundle.config',
+        // The plugin manager keys bundle configuration by the bundle's exact
+        // package name (entryKey: pkg.name) — the card only shows on this
+        // bundle's page.
+        key: PLUGIN_NAME,
         inject: () => ({ scope, listModels: () => available.slice(), lastError: () => lastError, refresh }),
       },
       VisionModelCard,
