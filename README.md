@@ -62,7 +62,9 @@ pnpm typecheck  # Host 类型检查（typecheck:client 为浏览器半侧）
 
 > 两种方式产出的 Host 半侧完全相同；客户端 bundle（`lib/client.js`）由 `scripts/build-client.mjs` 在本仓库内独立构建，随 `pnpm build` / `prepare` 一并产出。
 
-### 2. 配置（`settings` → 命名空间 `vision`）
+### 2. 配置（插件管理页 → vision-tool）
+
+> 自 dsh `0.1.7-alpha.1` 起，可编辑字段通过 Config schema 上的 `.volatile()` 声明、按 profile 条目 id（`cordis.patch.yml` 里的 `id: dsh-vision-tool`）暴露，旧版 `settings` 的 `vision` 命名空间概念已移除；字段名与默认值不变。
 
 | 字段 | 类型 | 默认值 | 含义 |
 |---|---|---|---|
@@ -101,7 +103,7 @@ llm-pi-ai:
 
 ## 版本兼容
 
-Host 半侧兼容 dsh `0.1.5-rc.2`、`0.1.6-alpha.1` 与 `0.1.6-alpha.2`（peer 范围 `^0.1.6-alpha.1`，基线 `>=0.1.5-rc.2 <0.2.0`，`@deepseek-ai/cordis ^4.0.1`）；`0.1.6-alpha.2` 起适配器声明的 `inputModalities` 才接入 `resolveModelInfo`，更早版本的适配器退避只认用户 `overrides`。Web 配置卡片基于插件管理页的 `plugins.bundle.config` 插槽，**要求 dsh `0.1.6-alpha.2+`**（更早版本的设置页宿主不渲染该插槽，卡片不出现，但不影响 Host 半侧运行，配置可走 `cordis.yml`）。
+**当前构建目标 dsh `0.1.7-alpha.1`**（`0.1.7` 重构了设置子系统：`settings.installSection` 与客户端 `settingsScope` 服务移除，改为 `.volatile()` 声明 + `configForms` 服务，本插件已迁移）。旧版 dsh `0.1.5-rc.2`～`0.1.6-alpha.2` 请使用本插件的 `0.1.6` 兼容构建。Web 配置卡片基于插件管理页的 `plugins.bundle.config` 插槽与 `configForms` 服务，要求 dsh `0.1.7-alpha.1+`；卡片不出现不影响 Host 半侧运行，配置可走 `cordis.yml`。
 
 ## 实现说明：准入放行与客户端 bundle 格式
 

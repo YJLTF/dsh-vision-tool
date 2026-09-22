@@ -4,9 +4,6 @@
  * dragging Host packages into the client bundle.
  */
 
-/** Settings namespace bound to both the Host half and the browser settings card. */
-export const VISION_NS = 'vision'
-
 /** Plugin identity used for message provenance. */
 export const PLUGIN_NAME = 'dsh-vision-tool'
 

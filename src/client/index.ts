@@ -7,10 +7,16 @@
  * plugin manager asks bundles for their configuration through the
  * `plugins.bundle.config` keyed slot, keyed by the bundle's package name and
  * rendered with the owner face `{ view }` (`'page'` on the bundle's page,
- * `'summary'` reserved for one-liners). The card still reads the
+ * `'summary'` reserved for one-liners).
+ *
+ * Since dsh 0.1.7-alpha.1 the settings namespace model is gone: the plugin's
+ * Config fields declared `.volatile()` are exposed per profile entry id, and
+ * the browser reaches them through the `configForms` service —
+ * `configForms.get(entryId)` returns the entry's shared form (snapshot +
+ * serialized writes), with the entry id equal to this bundle's package name
+ * (the id its `cordis.patch.yml` inserts). The card still reads the
  * Host-generation model catalog through `remote.session.modelCatalog()`, the
- * same read the built-in model picker uses, and edits the `vision` settings
- * namespace through the client settings scope.
+ * same read the built-in model picker uses.
  *
  * BUILD: this bundle must ship as `lib/client.js` in the lazy-CJS
  * `window.__ModuleLoader__` wrapper the web plugin route serves; see
@@ -23,7 +29,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // client bundle keeps its purity gate (slot contract owned by the plugin
 // manager package, never imported at runtime).
 import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
-import { PLUGIN_NAME, VISION_NS } from '../meta.js'
+import { PLUGIN_NAME } from '../meta.js'
 import { VisionModelCard, type ModelChoice } from './vision-model-card.js'
 
 /** Card face injected beside the scope: the configured-model choices. */
@@ -35,10 +41,10 @@ export interface VisionCardFace {
       writable: boolean
     }
     subscribe(listener: () => void): () => void
-    set(field: string, value: unknown): Promise<void>
-    unset(field: string): Promise<void>
+    set(field: string, value: unknown): Promise<boolean>
+    unset(field: string): Promise<boolean>
     /** One atomic namespace mutation over path-addressed edits. */
-    mutate(ops: readonly ({ op: 'set'; path: string[]; value: unknown } | { op: 'unset'; path: string[] })[]): Promise<void>
+    mutate(ops: readonly ({ op: 'set'; path: string[]; value: unknown } | { op: 'unset'; path: string[] })[]): Promise<boolean>
   }
   /**
    * Snapshot of the catalog read so far, copied per call. The inject face is
@@ -51,10 +57,14 @@ export interface VisionCardFace {
   refresh(): Promise<void>
 }
 
-export const inject = ['slots', 'settingsScope', 'remote', 'remote.session']
+export const inject = ['slots', 'configForms', 'remote', 'remote.session']
 
 export function apply(ctx: ClientContext): void {
-  const scope = ctx.settingsScope.bind({ namespace: VISION_NS })
+  // The entry's shared configuration form — the volatile Config fields the web
+  // card edits, identified by this bundle's profile entry id (the package
+  // name). Owned by the settings provider; reads derive from its shared
+  // describe mirror, writes serialize through `remote.settings`.
+  const scope = ctx.configForms.get(PLUGIN_NAME)
   // The Host-generation model catalog — dsh's single source of configured
   // models — read once at activation and re-readable from the card. A failed
   // or absent catalog degrades the card to manual entry, never to no card.

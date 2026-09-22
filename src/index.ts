@@ -2,9 +2,11 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
 import type { ModelModality } from '@deepseek-ai/dsh-llm'
+// Type-only: brings the `settings` service declaration into the Context type
+// for the `configure({ auto: false })` child below.
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-session'
-import { Config, PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, type Config as ConfigType } from './config.js'
+import { PLUGIN_NAME, VISION_DEFAULT_PROMPT, type Config as ConfigType, type ResolvedConfig } from './config.js'
 import { isVision } from './capability.js'
 import { registerUnderstandImageTool } from './tool-understand-image.js'
 
@@ -26,19 +28,34 @@ import { registerUnderstandImageTool } from './tool-understand-image.js'
  * instead of being rejected before the model ever sees them.
  */
 export const name = PLUGIN_NAME
-export const inject = ['settings', 'llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
+export const inject = ['llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
+// The Loader projects the entry's settings form and validates card writes from
+// the module namespace's `Config` export (`fiber.runtime.Config`); without it
+// the entry has no settings form and every card save is refused with
+// "No configurable plugin entry".
+export { Config } from './config.js'
 
-const GUIDANCE_CONTEXT_NAME = `${VISION_NS}:image-guidance`
+const GUIDANCE_CONTEXT_NAME = `vision:image-guidance`
 
 interface ResolveModelInfo {
   (provider: string, model: string, signal?: AbortSignal): Promise<{ inputModalities?: readonly ModelModality[] }>
 }
 
-export function apply(ctx: Context, initial: ConfigType) {
+export function apply(ctx: Context, initial: ResolvedConfig) {
   // Read-through state so edits made in the web card apply to later requests.
-  // `setSource` hands us the current config *reader*, not a snapshot.
-  let currentSource: () => ConfigType = () => initial
-  const readConfig = () => currentSource()
+  // Every card-editable field is declared `.volatile()` (src/config.ts), so the
+  // Loader hands each one as a live reference and commits card writes into it
+  // in place — reading `.get()` per request is always current, with nothing to
+  // flush.
+  const readConfig = (): ConfigType => ({
+    enabled: initial.enabled.get(),
+    visionProvider: initial.visionProvider.get(),
+    visionModel: initial.visionModel.get(),
+    visionSystemPrompt: initial.visionSystemPrompt.get(),
+    maxTokens: initial.maxTokens.get(),
+    guidanceInjection: initial.guidanceInjection.get(),
+    overrides: initial.overrides.get(),
+  })
   const visionTarget = () => {
     const config = readConfig()
     return {
@@ -50,16 +67,11 @@ export function apply(ctx: Context, initial: ConfigType) {
     }
   }
 
+  // The Plugin Manager hosts this bundle's configuration card, so the entry's
+  // automatic Settings page stays off. Optional child: the plugin runs fine
+  // without the Settings service composed.
   ctx.inject(['settings'], (settingsCtx) => {
-    return settingsCtx.settings.installSection(ctx, VISION_NS, Config, initial, {
-      setSource: (next) => {
-        currentSource = next
-      },
-      onChange: () => {
-        // Read-through needs no invalidation: every consumer re-reads
-        // `readConfig()` per request, so there is nothing to flush here.
-      },
-    })
+    return settingsCtx.settings.configure({ auto: false }, ctx.fiber)
   })
 
   ctx.inject(['llm', 'attachments', 'tools', 'systemPrompt', 'sessions'], (core) => {
