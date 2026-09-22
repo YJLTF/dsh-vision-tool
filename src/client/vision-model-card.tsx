@@ -150,7 +150,13 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
       if (JSON.stringify(draft.overrides) !== JSON.stringify(saved.overrides)) {
         ops.push({ op: 'set', path: ['overrides'], value: draft.overrides ?? [] })
       }
-      if (ops.length > 0) await scope.mutate(ops)
+      // Host acceptance resolves `true`; refusal resolves `false` (the form
+      // reloads Host state itself), and only transport failures reject. Either
+      // way the draft stays so the user can retry over the reloaded values.
+      if (ops.length > 0 && !(await scope.mutate(ops))) {
+        setFailed(true)
+        return
+      }
       setDraft(null)
       setFailed(false)
     } catch {

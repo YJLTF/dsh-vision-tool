@@ -7,7 +7,6 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { PLUGIN_NAME } from './config.js'
 
 const EXTENSION_TO_MEDIA: Record<string, ImageMediaType> = {
   '.png': 'image/png',
@@ -17,15 +16,22 @@ const EXTENSION_TO_MEDIA: Record<string, ImageMediaType> = {
   '.gif': 'image/gif',
 }
 
-/** Collect image attachment refs from message content, including nested tool results. */
+/**
+ * This plugin's message-source producer kind. The vocabulary is
+ * merge-extensible: a plugin registers its own kind instead of borrowing
+ * another producer's, and consumers fall through unknown kinds.
+ */
+declare module '@deepseek-ai/dsh-llm/message' {
+  interface MessageSourceMap {
+    'dsh-vision-tool': { kind: 'dsh-vision-tool' }
+  }
+}
+
+/** Collect image attachment refs from one message's content blocks. */
 function collectImageRefs(blocks: readonly ContentBlock[], into: ImageAttachmentRef[]): void {
   for (const block of blocks) {
     if (block.type === 'image') {
       into.push(block.attachment)
-      continue
-    }
-    if (block.type === 'tool-result') {
-      collectImageRefs((block as { content: readonly ContentBlock[] }).content, into)
     }
   }
 }
@@ -33,8 +39,9 @@ function collectImageRefs(blocks: readonly ContentBlock[], into: ImageAttachment
 /**
  * Image attachments referenced by this session's conversation, most recent
  * first. Pasted images enter the log as durable attachment references inside
- * user messages; the engine replaces them with text placeholders only at
- * LLM-request time, so the log always holds the real references.
+ * user messages, and tool results persist as tool-role messages whose content
+ * carries the result blocks; the engine replaces images with text placeholders
+ * only at LLM-request time, so the log always holds the real references.
  */
 export function conversationImages(ctx: Context, agent: Agent | undefined): ImageAttachmentRef[] {
   if (agent === undefined) return []
@@ -143,7 +150,7 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
       }
 
       const user = createUserMessage({
-        source: { kind: 'plugin', plugin: PLUGIN_NAME },
+        source: { kind: 'dsh-vision-tool' },
         content: [
           { type: 'text', text: question },
           attachment,
