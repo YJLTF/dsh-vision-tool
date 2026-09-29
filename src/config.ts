@@ -1,8 +1,6 @@
 import z from '@deepseek-ai/schemastery'
 import { VISION_DEFAULT_PROMPT } from './meta.js'
 
-export { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS } from './meta.js'
-
 export interface ModalityOverride {
   /** Exact model id the declaration applies to. */
   model: string
@@ -47,6 +45,9 @@ const labeled = <T,>(node: z<T>, key: keyof typeof lang['zh-CN']): z<T> =>
     'en-US': { description: key },
   })
 
+// Root-volatile marker: `.extra('volatile', true)` is the official `.volatile()`
+// marking (that method delegates to exactly this call), spelled out because its
+// typed wrapper changes the schema's call-signature mode away from `z<Config>`.
 export const Config: z<Config> = z.object({
   enabled: labeled(z.boolean().default(true), 'enabled'),
   visionProvider: labeled(z.string().default(''), 'visionProvider'),
@@ -62,26 +63,3 @@ export const Config: z<Config> = z.object({
   .i18n({
     'zh-CN': { description: '识图代理:为纯文本主模型补上图片理解能力(详见 README)' },
   })
-
-/**
- * The volatile section reference dsh 0.2.0 hands a plugin whose whole Config
- * is marked volatile: `{ get(): current }`, refreshed in place by every
- * committed settings write, so reads always see the latest committed values
- * without a plugin reload.
- */
-interface VolatileSection<T> {
-  get(): T
-}
-
-/**
- * Read the live plugin section out of the `apply` config argument. A
- * volatile-capable Host resolves the root-volatile schema into a reference;
- * a Host without the protocol (or a test harness) passes the plain resolved
- * snapshot, which this returns unchanged.
- */
-export function unwrapConfig(value: unknown): Config {
-  if (typeof value === 'object' && value !== null && typeof (value as VolatileSection<Config>).get === 'function') {
-    return (value as VolatileSection<Config>).get()
-  }
-  return value as Config
-}

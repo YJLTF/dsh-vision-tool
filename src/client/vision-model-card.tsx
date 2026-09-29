@@ -179,6 +179,30 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
 
   const overrides = value.overrides ?? []
 
+  // The manual provider/model entry pair. Shown standalone when the catalog is
+  // unavailable (with example placeholders) and as a dropdown-side override when
+  // it is. A plain function returning elements — not a component type — so the
+  // inputs keep their identity (and focus) across renders.
+  const manualModelInputs = (withExamples: boolean): ReactNode =>
+    h('div', { className: 'dvt-row2' },
+      h('input', {
+        className: 'dvt-input',
+        'aria-label': 'provider 路由',
+        placeholder: withExamples ? 'provider 路由(如 zai-coding-cn)' : 'provider 路由',
+        value: value.visionProvider ?? '',
+        disabled: !writable,
+        onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionProvider: e.target.value || undefined }),
+      }),
+      h('input', {
+        className: 'dvt-input',
+        'aria-label': '模型 id',
+        placeholder: withExamples ? '模型 id(如 glm-5.3-flash)' : '模型 id',
+        value: value.visionModel ?? '',
+        disabled: !writable,
+        onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionModel: e.target.value || undefined }),
+      }),
+    )
+
   if (view === 'summary') {
     const line = value.enabled === false
       ? '识图代理已关闭'
@@ -209,65 +233,33 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
         : '暂无法枚举已配置的模型,请在下方手动输入 dsh 中已配置的多模态模型。',
     },
       choices.length > 0
-        ? h('div', { style: { display: 'flex', gap: 8 } },
-            h('select', {
-              id: 'dvt-model',
-              className: 'dvt-input dvt-select',
-              value: selected,
-              disabled: !writable,
-              onChange: (e: ChangeEvent<HTMLSelectElement>) => {
-                if (e.target.value === '') { edit({ visionProvider: undefined, visionModel: undefined }); return }
-                const [p, m] = e.target.value.split('/')
-                edit({ visionProvider: p, visionModel: m })
-              },
+      ? h('div', { style: { display: 'flex', gap: 8 } },
+          h('select', {
+            id: 'dvt-model',
+            className: 'dvt-input dvt-select',
+            value: selected,
+            disabled: !writable,
+            onChange: (e: ChangeEvent<HTMLSelectElement>) => {
+              if (e.target.value === '') { edit({ visionProvider: undefined, visionModel: undefined }); return }
+              const [p, m] = e.target.value.split('/')
+              edit({ visionProvider: p, visionModel: m })
             },
-              h('option', { key: '', value: '' }, '— 选择一个模型 —'),
-              options.map(c =>
-                h('option', { key: c.label, value: `${c.provider}/${c.model}` }, c.label)),
-            ),
-            h('button', {
-              type: 'button',
-              className: 'dvt-ghost',
-              onClick: () => void refreshChoices(),
-            }, '刷新列表'),
-          )
-        : h('div', { className: 'dvt-row2' },
-            h('input', {
-              className: 'dvt-input',
-              placeholder: 'provider 路由(如 zai-coding-cn)',
-              value: value.visionProvider ?? '',
-              disabled: !writable,
-              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionProvider: e.target.value || undefined }),
-            }),
-            h('input', {
-              className: 'dvt-input',
-              placeholder: '模型 id(如 glm-5.3-flash)',
-              value: value.visionModel ?? '',
-              disabled: !writable,
-              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionModel: e.target.value || undefined }),
-            }),
+          },
+            h('option', { key: '', value: '' }, '— 选择一个模型 —'),
+            options.map(c =>
+              h('option', { key: c.label, value: `${c.provider}/${c.model}` }, c.label)),
           ),
+          h('button', {
+            type: 'button',
+            className: 'dvt-ghost',
+            onClick: () => void refreshChoices(),
+          }, '刷新列表'),
+        )
+      : manualModelInputs(true),
     ),
     choices.length > 0
       ? h('div', { className: 'dvt-field' },
-          h('div', { className: 'dvt-row2' },
-            h('input', {
-              className: 'dvt-input',
-              'aria-label': 'provider 路由',
-              placeholder: 'provider 路由',
-              value: value.visionProvider ?? '',
-              disabled: !writable,
-              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionProvider: e.target.value || undefined }),
-            }),
-            h('input', {
-              className: 'dvt-input',
-              'aria-label': '模型 id',
-              placeholder: '模型 id',
-              value: value.visionModel ?? '',
-              disabled: !writable,
-              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionModel: e.target.value || undefined }),
-            }),
-          ),
+          manualModelInputs(false),
           catalogError ? h('p', { className: 'dvt-catalogError' }, `模型目录读取失败:${catalogError}`) : null,
         )
       : null,

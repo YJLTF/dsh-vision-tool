@@ -7,7 +7,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
 import type { ContentBlock, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { PLUGIN_NAME } from './config.js'
+import { PLUGIN_NAME } from './meta.js'
 
 // This bundle's provenance kind for the user-role messages it creates: 0.2.0
 // has no shared `plugin` source kind — every producer declares its own kind in
@@ -44,7 +44,7 @@ function collectImageRefs(message: Message, into: ImageAttachmentRef[]): void {
  * user messages; the engine replaces them with text placeholders only at
  * LLM-request time, so the log always holds the real references.
  */
-export function conversationImages(ctx: Context, agent: Agent | undefined): ImageAttachmentRef[] {
+function conversationImages(ctx: Context, agent: Agent | undefined): ImageAttachmentRef[] {
   if (agent === undefined) return []
   const session = ctx.sessions.get(agent.id)
   if (session === undefined) return []
@@ -56,6 +56,23 @@ export function conversationImages(ctx: Context, agent: Agent | undefined): Imag
 }
 
 /**
+ * The vision call target, re-read from the live volatile config on every tool
+ * execution so committed settings edits apply without a plugin reload.
+ */
+export interface VisionTarget {
+  /** Provider route of the small multimodal model; unset until configured. */
+  provider?: string
+  /** Exact model id of the small multimodal model; unset until configured. */
+  model?: string
+  /** System prompt the vision model follows for every call. */
+  systemPrompt: string
+  /** Max output tokens for one vision call. */
+  maxTokens: number
+  /** Master switch; `false` makes both tools refuse to run. */
+  enabled: boolean
+}
+
+/**
  * Model-facing tool that answers image-understanding questions by dispatching a
  * one-shot multimodal request to the configured small vision model. It is the
  * compensation path for text-only main models: they never receive image bytes
@@ -64,14 +81,7 @@ export function conversationImages(ctx: Context, agent: Agent | undefined): Imag
  * inspects the most recent image in the conversation — the typical case for a
  * pasted screenshot the model only ever saw as a text-only placeholder.
  */
-export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: () => {
-  provider?: string
-  model?: string
-  systemPrompt: string
-  maxTokens: number
-  /** Master switch; `false` makes both tools refuse to run. */
-  enabled: boolean
-}) {
+export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: () => VisionTarget) {
   const tools: Array<() => void> = []
   tools.push(ctx.tools.register(defineTool({
     name: 'understand_image',

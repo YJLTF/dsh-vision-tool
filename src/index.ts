@@ -1,12 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
-import type { ModelModality } from '@deepseek-ai/dsh-llm'
+import type { LlmRuntime, ModelModality } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-session'
-import { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, unwrapConfig, type Config as ConfigType } from './config.js'
-import { isVision } from './capability.js'
-import { registerUnderstandImageTool } from './tool-understand-image.js'
+import { type Config as ConfigType } from './config.js'
+import { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS } from './meta.js'
+import { registerUnderstandImageTool, type VisionTarget } from './tool-understand-image.js'
 
 // The entry's configuration schema. The Loader turns this into the profile
 // entry's settings form (ns = the patch insert id, `dsh-vision-tool`); the
@@ -34,28 +34,29 @@ export { Config } from './config.js'
  * instead of being rejected before the model ever sees them.
  *
  * Configuration: since dsh 0.2.0 the Loader owns every plugin section — the
- * exported `Config` schema becomes the entry's form. The schema is marked
- * volatile, so `apply` receives a live section reference and web-card edits
- * apply to later requests without a plugin reload (the 0.1.x `installSection`
- * `setSource` hook is gone). The bundle's own card in the Plugin Manager is
- * the config surface, as before.
+ * exported `Config` schema becomes the entry's form, marked volatile so `apply`
+ * receives a live section reference and web-card edits apply to later requests
+ * without a plugin reload. The bundle's own card in the Plugin Manager is the
+ * config surface.
  */
 export const name = PLUGIN_NAME
 export const inject = ['llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
 
 const GUIDANCE_CONTEXT_NAME = `${VISION_NS}:image-guidance`
 
-interface ResolveModelInfo {
-  (provider: string, model: string, signal?: AbortSignal): Promise<{ inputModalities?: readonly ModelModality[] }>
+type ResolveModelInfo = LlmRuntime['resolveModelInfo']
+
+/** The live volatile section reference the Host hands `apply` for a volatile schema. */
+interface VolatileSection {
+  get(): ConfigType
 }
 
-export function apply(ctx: Context, initial: ConfigType | { get(): ConfigType }) {
+export function apply(ctx: Context, initial: VolatileSection) {
   // Live config: the root-volatile schema resolves to a section reference whose
   // `get()` re-reads committed values, so edits made in the Settings UI apply
-  // to later requests without a reload; a plain snapshot (no volatile support)
-  // passes straight through.
-  const readConfig = () => unwrapConfig(initial)
-  const visionTarget = () => {
+  // to later requests without a reload.
+  const readConfig = () => initial.get()
+  const visionTarget = (): VisionTarget => {
     const config = readConfig()
     return {
       provider: config.visionProvider || undefined,
@@ -153,13 +154,23 @@ export function apply(ctx: Context, initial: ConfigType | { get(): ConfigType })
 }
 
 /**
+ * Whether the resolved modality list makes the route vision-capable.
+ * `undefined` (unknown metadata) conservatively counts as text-only, matching
+ * the engine's own projection default.
+ */
+function isVision(modalities: readonly ModelModality[] | undefined): boolean {
+  return modalities?.includes('image') === true
+}
+
+/**
  * Model-visible guidance emitted only for text-only agents. Vision-capable
  * agents get nothing, so the plugin never interferes with native multimodal use.
  *
  * The context callback computes from `agent.options` — the creation-time route.
- * `reconcileGuidance` then re-decides per assembly from the prompt variables the
- * harness model-selection layer overrides with the actually selected route, so
- * a mid-session model switch flips the guidance on the very next turn.
+ * The assemble-waterfall listener then re-decides per assembly from the prompt
+ * variables the harness model-selection layer overrides with the actually
+ * selected route, so a mid-session model switch flips the guidance on the very
+ * next turn.
  */
 function guidanceFor(
   assembly: AssembleContext,
@@ -205,9 +216,7 @@ const GUIDANCE_BODY = [
   + 'an image unless you actually ran `understand_image`.',
 ].join('')
 
-interface RelaxedResolveModelInfo extends ResolveModelInfo {
-  __visionOriginal?: ResolveModelInfo
-}
+type RelaxedResolveModelInfo = ResolveModelInfo & { __visionOriginal?: ResolveModelInfo }
 
 /**
  * Relax the session prompt-admission image gate on the shared LlmRuntime.
@@ -243,7 +252,6 @@ function relaxImageAdmission(llm: { resolveModelInfo: ResolveModelInfo }): Resol
     // A non-writable service facade keeps the stock gate; the plugin still
     // works for native multimodal models and for models the user marks
     // multimodal via overrides.
-    return bindResolve(original, llm)
   }
   return bindResolve(original, llm)
 }
