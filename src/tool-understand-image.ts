@@ -6,8 +6,17 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-session'
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
-import type { ContentBlock, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { PLUGIN_NAME } from './config.js'
+
+// This bundle's provenance kind for the user-role messages it creates: 0.2.0
+// has no shared `plugin` source kind — every producer declares its own kind in
+// the merge-extensible source map.
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'dsh-vision-tool': { kind: 'dsh-vision-tool'; plugin: string }
+  }
+}
 
 const EXTENSION_TO_MEDIA: Record<string, ImageMediaType> = {
   '.png': 'image/png',
@@ -17,16 +26,15 @@ const EXTENSION_TO_MEDIA: Record<string, ImageMediaType> = {
   '.gif': 'image/gif',
 }
 
-/** Collect image attachment refs from message content, including nested tool results. */
-function collectImageRefs(blocks: readonly ContentBlock[], into: ImageAttachmentRef[]): void {
-  for (const block of blocks) {
-    if (block.type === 'image') {
-      into.push(block.attachment)
-      continue
-    }
-    if (block.type === 'tool-result') {
-      collectImageRefs((block as { content: readonly ContentBlock[] }).content, into)
-    }
+/**
+ * Collect image attachment refs from one message. Since 0.2.0 tool results are
+ * first-class tool-role messages rather than nested content blocks, so every
+ * role's block list is scanned directly — no recursion, and unknown roles are
+ * scanned too (the content map is merge-extensible).
+ */
+function collectImageRefs(message: Message, into: ImageAttachmentRef[]): void {
+  for (const block of message.content as readonly ContentBlock[]) {
+    if (block.type === 'image') into.push(block.attachment)
   }
 }
 
@@ -42,7 +50,7 @@ export function conversationImages(ctx: Context, agent: Agent | undefined): Imag
   if (session === undefined) return []
   const refs: ImageAttachmentRef[] = []
   for (const message of session.deriveMessages()) {
-    collectImageRefs(message.content, refs)
+    collectImageRefs(message, refs)
   }
   return refs.reverse()
 }
@@ -143,7 +151,7 @@ export function registerUnderstandImageTool(ctx: Context, resolveVisionTarget: (
       }
 
       const user = createUserMessage({
-        source: { kind: 'plugin', plugin: PLUGIN_NAME },
+        source: { kind: 'dsh-vision-tool', plugin: PLUGIN_NAME },
         content: [
           { type: 'text', text: question },
           attachment,

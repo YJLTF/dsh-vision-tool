@@ -4,7 +4,7 @@ import type { AssembleContext } from '@deepseek-ai/dsh-system-prompt'
 import type { ModelModality } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-session'
-import { Config, PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, type Config as ConfigType } from './config.js'
+import { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, unwrapConfig, type Config as ConfigType } from './config.js'
 import { isVision } from './capability.js'
 import { registerUnderstandImageTool } from './tool-understand-image.js'
 
@@ -24,6 +24,14 @@ import { registerUnderstandImageTool } from './tool-understand-image.js'
  * reports as image-capable, and (c) relaxes the session prompt-admission gate
  * (`relaxImageAdmission`) so image-bearing prompts reach text-only agents
  * instead of being rejected before the model ever sees them.
+ *
+ * Configuration: since dsh 0.2.0 the Loader owns every plugin section — the
+ * exported `Config` schema becomes the entry's form. The schema is marked
+ * volatile, so `apply` receives a live section reference and web-card edits
+ * apply to later requests without a plugin reload (the 0.1.x `installSection`
+ * `setSource` hook is gone). The Host half only suppresses the auto-generated
+ * Settings page; the bundle's own card in the Plugin Manager is the config
+ * surface, as before.
  */
 export const name = PLUGIN_NAME
 export const inject = ['settings', 'llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
@@ -34,11 +42,12 @@ interface ResolveModelInfo {
   (provider: string, model: string, signal?: AbortSignal): Promise<{ inputModalities?: readonly ModelModality[] }>
 }
 
-export function apply(ctx: Context, initial: ConfigType) {
-  // Read-through state so edits made in the web card apply to later requests.
-  // `setSource` hands us the current config *reader*, not a snapshot.
-  let currentSource: () => ConfigType = () => initial
-  const readConfig = () => currentSource()
+export function apply(ctx: Context, initial: ConfigType | { get(): ConfigType }) {
+  // Live config: the root-volatile schema resolves to a section reference whose
+  // `get()` re-reads committed values, so edits made in the web card apply to
+  // later requests without a reload; a plain snapshot (no volatile support)
+  // passes straight through.
+  const readConfig = () => unwrapConfig(initial)
   const visionTarget = () => {
     const config = readConfig()
     return {
@@ -51,15 +60,11 @@ export function apply(ctx: Context, initial: ConfigType) {
   }
 
   ctx.inject(['settings'], (settingsCtx) => {
-    return settingsCtx.settings.installSection(ctx, VISION_NS, Config, initial, {
-      setSource: (next) => {
-        currentSource = next
-      },
-      onChange: () => {
-        // Read-through needs no invalidation: every consumer re-reads
-        // `readConfig()` per request, so there is nothing to flush here.
-      },
-    })
+    // The bundle's own Plugin-Manager card is the configuration surface; keep
+    // the Settings page from also generating a schema form for this entry.
+    // The disposer keeps this idempotent across settings-service restarts and
+    // clears the policy on plugin unload.
+    return settingsCtx.settings.configure({ auto: false })
   })
 
   ctx.inject(['llm', 'attachments', 'tools', 'systemPrompt', 'sessions'], (core) => {

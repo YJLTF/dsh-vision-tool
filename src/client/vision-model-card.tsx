@@ -1,5 +1,5 @@
 import { createElement, useCallback, useState, useSyncExternalStore } from 'react'
-import type { ReactNode } from 'react'
+import type { ChangeEvent, ReactNode } from 'react'
 import type { PluginConfigViewProps } from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { VISION_DEFAULT_PROMPT } from '../meta.js'
 import type { VisionCardFace } from './index.js'
@@ -82,7 +82,7 @@ function Field(props: {
   id: string
   label: string
   hint?: string
-  children: ReactNode
+  children?: ReactNode
 }): ReactNode {
   return h('div', { className: 'dvt-field' },
     h('div', { className: 'dvt-head' },
@@ -150,7 +150,10 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
       if (JSON.stringify(draft.overrides) !== JSON.stringify(saved.overrides)) {
         ops.push({ op: 'set', path: ['overrides'], value: draft.overrides ?? [] })
       }
-      if (ops.length > 0) await scope.mutate(ops)
+      if (ops.length > 0) {
+        // `false` is a Host refusal or skipped write; transport failures reject.
+        if (!(await scope.mutate(ops))) setFailed(true)
+      }
       setDraft(null)
       setFailed(false)
     } catch {
@@ -193,7 +196,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
         id: 'dvt-enabled',
         checked: value.enabled ?? true,
         disabled: !writable,
-        onChange: e => edit({ enabled: e.target.checked }),
+        onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ enabled: e.target.checked }),
       }),
       h('label', { className: 'dvt-checkLabel', htmlFor: 'dvt-enabled' },
         '启用文本模型的识图代理 (understand_image)'),
@@ -212,7 +215,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
               className: 'dvt-input dvt-select',
               value: selected,
               disabled: !writable,
-              onChange: e => {
+              onChange: (e: ChangeEvent<HTMLSelectElement>) => {
                 if (e.target.value === '') { edit({ visionProvider: undefined, visionModel: undefined }); return }
                 const [p, m] = e.target.value.split('/')
                 edit({ visionProvider: p, visionModel: m })
@@ -234,14 +237,14 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
               placeholder: 'provider 路由(如 zai-coding-cn)',
               value: value.visionProvider ?? '',
               disabled: !writable,
-              onChange: e => edit({ visionProvider: e.target.value || undefined }),
+              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionProvider: e.target.value || undefined }),
             }),
             h('input', {
               className: 'dvt-input',
               placeholder: '模型 id(如 glm-5.3-flash)',
               value: value.visionModel ?? '',
               disabled: !writable,
-              onChange: e => edit({ visionModel: e.target.value || undefined }),
+              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionModel: e.target.value || undefined }),
             }),
           ),
     ),
@@ -254,7 +257,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
               placeholder: 'provider 路由',
               value: value.visionProvider ?? '',
               disabled: !writable,
-              onChange: e => edit({ visionProvider: e.target.value || undefined }),
+              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionProvider: e.target.value || undefined }),
             }),
             h('input', {
               className: 'dvt-input',
@@ -262,7 +265,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
               placeholder: '模型 id',
               value: value.visionModel ?? '',
               disabled: !writable,
-              onChange: e => edit({ visionModel: e.target.value || undefined }),
+              onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ visionModel: e.target.value || undefined }),
             }),
           ),
           catalogError ? h('p', { className: 'dvt-catalogError' }, `模型目录读取失败:${catalogError}`) : null,
@@ -279,7 +282,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
         rows: 4,
         value: value.visionSystemPrompt ?? VISION_DEFAULT_PROMPT,
         disabled: !writable,
-        onChange: e => edit({ visionSystemPrompt: e.target.value }),
+        onChange: (e: ChangeEvent<HTMLTextAreaElement>) => edit({ visionSystemPrompt: e.target.value }),
       }),
     ),
     h(Field, {
@@ -295,7 +298,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
         'aria-invalid': maxTokensInvalid || undefined,
         value: maxTokensText,
         disabled: !writable,
-        onChange: e => {
+        onChange: (e: ChangeEvent<HTMLInputElement>) => {
           const text = e.target.value
           edit({ maxTokens: text === '' ? undefined : (Number(text) as VisionSettings['maxTokens']) })
         },
@@ -308,7 +311,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
         id: 'dvt-guidance',
         checked: value.guidanceInjection ?? true,
         disabled: !writable,
-        onChange: e => edit({ guidanceInjection: e.target.checked }),
+        onChange: (e: ChangeEvent<HTMLInputElement>) => edit({ guidanceInjection: e.target.checked }),
       }),
       h('label', { className: 'dvt-checkLabel', htmlFor: 'dvt-guidance' },
         '为纯文本模型注入识图引导(多模态模型自动退避)'),
@@ -326,7 +329,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
             placeholder: '模型 id',
             value: row.model,
             disabled: !writable,
-            onChange: e => {
+            onChange: (e: ChangeEvent<HTMLInputElement>) => {
               const next = [...overrides]
               next[index] = { ...row, model: e.target.value }
               edit({ overrides: next })
@@ -337,7 +340,7 @@ export function VisionModelCard(face: VisionCardFace & PluginConfigViewProps): R
             'aria-label': `覆盖模态 ${index + 1}`,
             value: row.modality,
             disabled: !writable,
-            onChange: e => {
+            onChange: (e: ChangeEvent<HTMLSelectElement>) => {
               const next = [...overrides]
               next[index] = { ...row, modality: e.target.value as 'text' | 'image' }
               edit({ overrides: next })

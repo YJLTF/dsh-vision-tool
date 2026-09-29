@@ -16,7 +16,7 @@ DeepSeek Harness 的引擎依据模型声明的 `inputModalities` 做字节投�
 - **零干扰退避**：模态判定优先级为 用户 `overrides` > 适配器声明的 `inputModalities`（`ctx.llm.resolveModelInfo`，按 provider/model 路由缓存一次）> 保守默认（视作纯文本，与引擎投影行为一致）。判定为多模态的模型不注入任何指导；agent 创建时与会话中途切换模型时（`model/selection` 日志事件）都会预热该路由的判定，`resolveModelInfo` 失败的路由下轮自动重试；系统提示指导还会在装配瀑布之后按**实际选中路由**复核一次，因此即使会话中途切换模型，下一轮的指导去留也会跟着正确翻转，而不是停留在创建时的默认模型上。
 - **贴图即用**：放宽宿主对带图消息的准入拒绝后，直接贴图提问即可——纯文本主模型看到占位符后会自主调用 `understand_image`（不带 `path`），无需用户指明文件路径。
 - **高质量识图**：工具强制要求主模型传入结合上下文的具体问题，拒绝空 `prompt`、不做"笼统描述"兜底；视觉模型系统提示要求"精确完整描述 + 逐字转录可见文本"。
-- **官方风格配置卡片**：卡片出现在 web 端顶部「插件」按钮打开的**插件管理页 → vision-tool 详情页**，与内置插件配置页同观感——暂存编辑 + 保存/放弃；保存后的修改即时作用于后续请求（读穿透 `setSource`），无需重启会话。
+- **官方风格配置卡片**：卡片出现在 web 端顶部「插件」按钮打开的**插件管理页 → vision-tool 详情页**，与内置插件配置页同观感——暂存编辑 + 保存/放弃；保存后的修改即时作用于后续请求（0.2.0 volatile 配置段：Host 侧 `apply` 持有活引用、每次请求重读，无需重启会话或插件）。
 - **从既有模型中选型**：设置卡片通过 `remote.session.modelCatalog()` 读取 dsh 的 Host 代模型目录，`visionProvider` / `visionModel` 直接从 dsh 已配置的模型里选，不建立第二套模型注册表；目录不可用时降级为手动输入。
 - **可关的指导注入**：`guidanceInjection` 可单独关闭系统提示指导，只保留工具本身。
 - **支持常见图片格式**：png / jpg / jpeg / webp / gif。
@@ -62,7 +62,9 @@ pnpm typecheck  # Host 类型检查（typecheck:client 为浏览器半侧）
 
 > 两种方式产出的 Host 半侧完全相同；客户端 bundle（`lib/client.js`）由 `scripts/build-client.mjs` 在本仓库内独立构建，随 `pnpm build` / `prepare` 一并产出。
 
-### 2. 配置（`settings` → 命名空间 `vision`）
+### 2. 配置（插件条目配置，web 端 vision-tool 详情页）
+
+自 dsh 0.2.0 起，设置栈不再有插件自注册的命名空间：Loader 直接把插件导出的 `Config` schema 变成 profile 插件条目的配置表单（本插件的条目 id / 表单 `ns` 即包名 `dsh-vision-tool`），schema 标记为 volatile，改动即时生效。
 
 | 字段 | 类型 | 默认值 | 含义 |
 |---|---|---|---|
@@ -101,20 +103,22 @@ llm-pi-ai:
 
 ## 版本兼容
 
-Host 半侧兼容 dsh `0.1.5-rc.2`、`0.1.6-alpha.1` 与 `0.1.6-alpha.2`（peer 范围 `^0.1.6-alpha.1`，基线 `>=0.1.5-rc.2 <0.2.0`，`@deepseek-ai/cordis ^4.0.1`）；`0.1.6-alpha.2` 起适配器声明的 `inputModalities` 才接入 `resolveModelInfo`，更早版本的适配器退避只认用户 `overrides`。Web 配置卡片基于插件管理页的 `plugins.bundle.config` 插槽，**要求 dsh `0.1.6-alpha.2+`**（更早版本的设置页宿主不渲染该插槽，卡片不出现，但不影响 Host 半侧运行，配置可走 `cordis.yml`）。
+**本分支面向 dsh `0.2.0-rc.1`**（`@deepseek-ai/cordis ^4.0.1`）。dsh 0.2.0 重写了设置栈（插件条目配置 + volatile 热更段）、把工具结果从内容块改为 tool-role 消息、并将消息来源改为"每个生产者自声明 kind"的合并扩展模型，这些均为破坏性变更，**与 0.1.x 不兼容**——请使用 main 分支（兼容 dsh `0.1.5-rc.2` – `0.1.6-alpha.2`）。
+
+Web 配置卡片基于插件管理页的 `plugins.bundle.config` 插槽（以 bundle 包名为键），卡片通过 0.2.0 的 `ctx.configForms` 共享表单读写本条目配置；卡片缺失时（如旧版 web 宿主）Host 半侧不受影响，配置可走 `cordis.yml` 的插件条目配置。
 
 ## 实现说明：准入放行与客户端 bundle 格式
 
 **准入放行**：宿主在 `session/prompt` 准入时通过 `llm.resolveModelInfo` 服务方法判定模型能力，声明不含 `image` 的路由会收到 `MODEL_DOES_NOT_SUPPORT_IMAGES` 整条拒绝。本插件包装该服务方法，对这类路由在元数据中补报 `image` 能力使准入放行；而请求层的字节投影读取的是适配器自身元数据（不经过该方法），行为不变——纯文本模型的请求里图片仍是文本占位符。原生多模态路由不受影响，其它消费方（ACP、子代理等）最多元数据展示失真，行为上有投影兜底。插件卸载时恢复原方法；若服务门面不可写则跳过放行，其余功能不受影响。未来若 dsh 提供官方的准入开关，应迁移过去。
 
-**客户端 bundle**:dsh web 通过模块加载器按 `dsh.client` 声明发现客户端插件，加载的是懒 CJS 包装格式（`window.__ModuleLoader__.load({ id, factory: (require) => … })`），`@deepseek-ai/*` 与 `react` 保持外部化、由加载器的 `require` 在启动模块图中解析。`scripts/build-client.mjs` 用 rolldown 复刻了这一输出形态：`src/client` 打包为 CJS、外部化官方依赖后套上包装写入 `lib/client.js`。卡片遵循插件管理页的键控 slot 契约（`@deepseek-ai/dsh-client-ui-plugin-manager/client` 声明的 `plugins.bundle.config`，以 bundle 包名为键，仅类型导入、不引入运行时依赖）。
+**客户端 bundle**:dsh web 通过模块加载器按 `dsh.client` 声明发现客户端插件，加载的是懒 CJS 包装格式（`window.__ModuleLoader__.load({ id, factory: (require) => … })`），`@deepseek-ai/*` 与 `react` 保持外部化、由加载器的 `require` 在启动模块图中解析。`scripts/build-client.mjs` 用 rolldown 复刻了这一输出形态：`src/client` 打包为 CJS、外部化官方依赖后套上包装写入 `lib/client.js`。卡片遵循插件管理页的键控 slot 契约（`@deepseek-ai/dsh-client-ui-plugin-manager/client` 声明的 `plugins.bundle.config`，以 bundle 包名为键，仅类型导入、不引入运行时依赖）；配置读写走 ui-settings 插件提供的 `ctx.configForms` 共享表单（按 profile 条目 id `dsh-vision-tool` 取表单，读共享 describe 镜像、写带 revision 围栏）。
 
 ## 目录
 
 - `src/meta.ts` — 无依赖共享常量（命名空间 / 插件名 / 默认提示词），供两侧安全复用。
-- `src/config.ts` — `vision` 命名空间的设置 schema。
+- `src/config.ts` — 插件条目的 `Config` schema（整段 volatile：改动即时生效，免重载）。
 - `src/capability.ts` — 模态判定（`ctx.llm.resolveModelInfo` + `overrides`）。
 - `src/tool-understand-image.ts` — `understand_image` 工具。
-- `src/index.ts` — Host `apply`：设置 + 工具 + 指导，按 agent 能力退避。
+- `src/index.ts` — Host `apply`：配置 + 工具 + 指导，按 agent 能力退避。
 - `src/client/` — 浏览器设置卡片（web UI）。
 - `scripts/build-client.mjs` — 客户端 bundle 构建（ModuleLoader 包装格式）。

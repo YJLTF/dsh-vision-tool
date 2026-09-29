@@ -38,4 +38,27 @@ export const Config: z<Config> = z.object({
     model: z.string(),
     modality: z.union([z.const('text'), z.const('image')]),
   })).default([]),
-})
+}).extra('volatile', true)
+
+/**
+ * The volatile section reference dsh 0.2.0 hands a plugin whose whole Config
+ * is marked volatile: `{ get(): current }`, refreshed in place by every
+ * committed settings write, so reads always see the latest committed values
+ * without a plugin reload.
+ */
+interface VolatileSection<T> {
+  get(): T
+}
+
+/**
+ * Read the live plugin section out of the `apply` config argument. A
+ * volatile-capable Host resolves the root-volatile schema into a reference;
+ * a Host without the protocol (or a test harness) passes the plain resolved
+ * snapshot, which this returns unchanged.
+ */
+export function unwrapConfig(value: unknown): Config {
+  if (typeof value === 'object' && value !== null && typeof (value as VolatileSection<Config>).get === 'function') {
+    return (value as VolatileSection<Config>).get()
+  }
+  return value as Config
+}
