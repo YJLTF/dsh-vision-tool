@@ -112,7 +112,7 @@ llm-pi-ai:
 
 ## 版本兼容
 
-**本分支面向 dsh `0.2.0-rc.1`**（`@deepseek-ai/cordis ^4.0.1`）。dsh 0.2.0 重写了设置栈（插件条目配置 + volatile 热更段）、把工具结果从内容块改为 tool-role 消息、并将消息来源改为"每个生产者自声明 kind"的合并扩展模型，这些均为破坏性变更，**与 0.1.x 不兼容**——请使用 main 分支（兼容 dsh `0.1.5-rc.2` – `0.1.6-alpha.2`）。
+**v0.3.0 面向 dsh `0.2.0-rc.1`**（`@deepseek-ai/cordis ^4.0.1`；宿主依赖钉 `0.2.0-rc.1`）。dsh 0.2.0 重写了设置栈（插件条目配置 + volatile 热更段）、把工具结果从内容块改为 tool-role 消息、并将消息来源改为"每个生产者自声明 kind"的合并扩展模型，这些均为破坏性变更，**与 0.1.x 不兼容**——dsh `0.1.5-rc.2` – `0.1.6-alpha.2` 用户请安装 v0.1.0（设置栈重写前的最后一线，pin 提交 `40f2fcd`）：`dsh plugin --profile <profile> add github:YJLTF/dsh-vision-tool#40f2fcd`。
 
 **schemastery ≥ 3.18.4**：volatile 热更依赖 `@deepseek-ai/schemastery` 3.18.4 引入的引用协议（schema 标记 volatile 后解析产出 `get()` 活引用，Loader 就地提交热更值）。本包 devDependencies 已钉 `~3.18.4`；若你的运行时把本包解析到更旧的 schemastery，表单仍能渲染、保存也会落盘，但运行中的值不再热更、需重启 dsh 生效。dsh `0.2.0-rc.1` 自身依赖 `~3.18.4`，正常安装不受影响。
 
