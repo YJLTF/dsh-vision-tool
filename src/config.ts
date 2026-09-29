@@ -27,18 +27,41 @@ export interface Config {
   overrides?: ModalityOverride[]
 }
 
+const lang = {
+  'zh-CN': {
+    enabled: '总开关:关闭后识图指导不注入,两个识图工具都会拒绝执行',
+    visionProvider: '识图模型的提供方路由(如 zai-coding-cn)',
+    visionModel: '识图模型的精确模型 id(须在 dsh 模型配置里声明图片输入)',
+    visionSystemPrompt: '视觉模型每次识图调用遵循的系统提示词',
+    maxTokens: '单次识图调用的最大输出 token 数(256–8192)',
+    guidanceInjection: '为纯文本模型注入识图指导(多模态模型自动退避)',
+    overrides: '多模态声明覆盖:按模型显式声明模态,优先级高于适配器元数据(退避依据)',
+    model: '模型 id',
+    modality: '声明的输入模态',
+  },
+} as const
+
+const labeled = <T,>(node: z<T>, key: keyof typeof lang['zh-CN']): z<T> =>
+  node.i18n({
+    'zh-CN': { description: lang['zh-CN'][key] },
+    'en-US': { description: key },
+  })
+
 export const Config: z<Config> = z.object({
-  enabled: z.boolean().default(true),
-  visionProvider: z.string().default(''),
-  visionModel: z.string().default(''),
-  visionSystemPrompt: z.string().default(VISION_DEFAULT_PROMPT),
-  maxTokens: z.natural().min(256).max(8192).default(2048),
-  guidanceInjection: z.boolean().default(true),
-  overrides: z.array(z.object({
-    model: z.string(),
-    modality: z.union([z.const('text'), z.const('image')]),
-  })).default([]),
+  enabled: labeled(z.boolean().default(true), 'enabled'),
+  visionProvider: labeled(z.string().default(''), 'visionProvider'),
+  visionModel: labeled(z.string().default(''), 'visionModel'),
+  visionSystemPrompt: labeled(z.string().default(VISION_DEFAULT_PROMPT), 'visionSystemPrompt'),
+  maxTokens: labeled(z.natural().min(256).max(8192).default(2048), 'maxTokens'),
+  guidanceInjection: labeled(z.boolean().default(true), 'guidanceInjection'),
+  overrides: labeled(z.array(z.object({
+    model: labeled(z.string(), 'model'),
+    modality: labeled(z.union([z.const('text'), z.const('image')]), 'modality'),
+  })).default([]), 'overrides'),
 }).extra('volatile', true)
+  .i18n({
+    'zh-CN': { description: '识图代理:为纯文本主模型补上图片理解能力(详见 README)' },
+  })
 
 /**
  * The volatile section reference dsh 0.2.0 hands a plugin whose whole Config

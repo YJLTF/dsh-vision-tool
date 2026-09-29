@@ -11,33 +11,15 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./client": {
-      "types": "./lib/types/client/index.d.ts",
-      "default": "./lib/client.js"
-    },
     "./package.json": "./package.json"
   },
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    },
-    "client": {
-      "platform": "web",
-      "inject": [
-        "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-api-remotes"
-      ]
-    }
-  },
   "scripts": {
-    "build": "tsdown && tsc -p tsconfig.build.json && node scripts/build-client.mjs",
-    "prepare": "tsdown && tsc -p tsconfig.build.json && node scripts/build-client.mjs",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "typecheck:client": "tsc --noEmit -p tsconfig.client.json"
+    "build": "tsdown && tsc -p tsconfig.build.json",
+    "prepare": "tsdown && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "files": [
     "lib/index.js",
-    "lib/client.js",
     "lib/types/**/*.d.ts",
     "cordis.patch.yml"
   ],
@@ -56,9 +38,6 @@
     "@deepseek-ai/dsh-agent": "0.2.0-rc.1",
     "@deepseek-ai/dsh-api-remotes": "0.2.0-rc.1",
     "@deepseek-ai/dsh-attachment": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-plugin-manager": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-settings": "0.2.0-rc.1",
-    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.1",
     "@deepseek-ai/dsh-llm": "0.2.0-rc.1",
     "@deepseek-ai/dsh-session": "0.2.0-rc.1",
     "@deepseek-ai/dsh-settings": "0.2.0-rc.1",
@@ -66,9 +45,12 @@
     "@deepseek-ai/dsh-tools": "0.2.0-rc.1",
     "@deepseek-ai/schemastery": "^3.18.2",
     "@types/node": "^24.0.0",
-    "@types/react": "~18.3.1",
-    "react": "^18.2.0",
     "tsdown": "^0.12.0",
     "typescript": "^5.6.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

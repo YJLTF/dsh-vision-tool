@@ -34,7 +34,7 @@ import { registerUnderstandImageTool } from './tool-understand-image.js'
  * surface, as before.
  */
 export const name = PLUGIN_NAME
-export const inject = ['settings', 'llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
+export const inject = ['llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
 
 const GUIDANCE_CONTEXT_NAME = `${VISION_NS}:image-guidance`
 
@@ -44,8 +44,8 @@ interface ResolveModelInfo {
 
 export function apply(ctx: Context, initial: ConfigType | { get(): ConfigType }) {
   // Live config: the root-volatile schema resolves to a section reference whose
-  // `get()` re-reads committed values, so edits made in the web card apply to
-  // later requests without a reload; a plain snapshot (no volatile support)
+  // `get()` re-reads committed values, so edits made in the Settings UI apply
+  // to later requests without a reload; a plain snapshot (no volatile support)
   // passes straight through.
   const readConfig = () => unwrapConfig(initial)
   const visionTarget = () => {
@@ -58,14 +58,6 @@ export function apply(ctx: Context, initial: ConfigType | { get(): ConfigType })
       enabled: config.enabled !== false,
     }
   }
-
-  ctx.inject(['settings'], (settingsCtx) => {
-    // The bundle's own Plugin-Manager card is the configuration surface; keep
-    // the Settings page from also generating a schema form for this entry.
-    // The disposer keeps this idempotent across settings-service restarts and
-    // clears the policy on plugin unload.
-    return settingsCtx.settings.configure({ auto: false })
-  })
 
   ctx.inject(['llm', 'attachments', 'tools', 'systemPrompt', 'sessions'], (core) => {
     // The unpatched resolve, captured before the admission gate is relaxed —
