@@ -8,6 +8,14 @@ import { PLUGIN_NAME, VISION_DEFAULT_PROMPT, VISION_NS, unwrapConfig, type Confi
 import { isVision } from './capability.js'
 import { registerUnderstandImageTool } from './tool-understand-image.js'
 
+// The entry's configuration schema. The Loader turns this into the profile
+// entry's settings form (ns = the patch insert id, `dsh-vision-tool`); the
+// browser card registers into the Plugin Manager only while the Host serves
+// that namespace, so exporting it is what makes the web card (and settings
+// persistence) exist at all. The schema is root-volatile, so `apply` receives
+// a live section reference whose reads track committed edits without a reload.
+export { Config } from './config.js'
+
 /**
  * Vision capability proxy for the DeepSeek Harness.
  *
@@ -29,9 +37,8 @@ import { registerUnderstandImageTool } from './tool-understand-image.js'
  * exported `Config` schema becomes the entry's form. The schema is marked
  * volatile, so `apply` receives a live section reference and web-card edits
  * apply to later requests without a plugin reload (the 0.1.x `installSection`
- * `setSource` hook is gone). The Host half only suppresses the auto-generated
- * Settings page; the bundle's own card in the Plugin Manager is the config
- * surface, as before.
+ * `setSource` hook is gone). The bundle's own card in the Plugin Manager is
+ * the config surface, as before.
  */
 export const name = PLUGIN_NAME
 export const inject = ['llm', 'attachments', 'tools', 'systemPrompt', 'sessions']
