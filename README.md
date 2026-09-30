@@ -2,7 +2,7 @@
 
 一个 [DeepSeek Harness](https://deepseek-harness.github.io/deepseek-harness/) 插件：为**纯文本主模型**补上识图能力。它把图片理解委托给你配置的一个小参数多模态模型，再把结果以文本形式交还给主模型；当活跃模型自身支持图片输入时，插件**完全退避**，原生多模态体验不受任何影响。
 
-面向 **dsh `0.2.0-rc.1`**（`@deepseek-ai/cordis ^4.0.1`）。
+面向 **dsh `0.2.0-rc.2`**（peer 范围 `^0.2.0-rc.1`，`@deepseek-ai/cordis ^4.0.1`）。
 
 ## 这个插件干了什么
 
